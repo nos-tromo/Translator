@@ -54,11 +54,10 @@ translator = Translator()
 
 class TranslationRequest(BaseModel):
     """
-    Validation schema for translation request.
+    Validation schema for the translation request.
 
-    Attributes:
-        text (str): Input text to translate.
-        target_lang (str): The language code of the target language.
+    Args:
+        BaseModel (pydantic.BaseModel): Pydantic BaseModel for data validation.
     """
 
     text: str
@@ -67,10 +66,10 @@ class TranslationRequest(BaseModel):
 
 class DetectedLanguage(BaseModel):
     """
-    Validation schema for Detected language.
+    Validation schema for the detected language.
 
     Args:
-        BaseModel (_type_): _description_
+        BaseModel (pydantic.BaseModel): Pydantic BaseModel for data validation.
     """
 
     name: str
@@ -79,10 +78,10 @@ class DetectedLanguage(BaseModel):
 
 class TranslationResponse(BaseModel):
     """
-    Validation schema for translation response.
+    Validation schema for the translation response.
 
     Args:
-        BaseModel (_type_): _description_
+        BaseModel (pydantic.BaseModel): Pydantic BaseModel for data validation.
     """
 
     translation: str
