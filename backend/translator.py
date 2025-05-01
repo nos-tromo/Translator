@@ -147,6 +147,7 @@ class Translator:
             return self.tokenizer.batch_decode(outputs, skip_special_tokens=True)[0]
         except Exception as e:
             self.logger.error(f"Error during model inference: {e}")
+            return ""
 
     def translate(self, trg_lang: str, text: str) -> str:
         """
