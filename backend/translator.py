@@ -154,7 +154,7 @@ class Translator:
         Translates text sentence-wise between any supported MADLAD languages.
 
         Args:
-            target_lang (str): Target language code.
+            trg_lang (str): Target language code.
             text (str): Text to translate.
 
         Returns:
