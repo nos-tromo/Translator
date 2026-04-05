@@ -13,6 +13,7 @@
 # Backend (Python)
 # -----------------
 **/__pycache__/
+**/.claude/
 **/.idea/
 **/.log
 **/.venv/
