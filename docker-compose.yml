@@ -1,3 +1,23 @@
+#################################
+# Docker Compose for Translator Application
+# This configuration sets up a backend service using FastAPI and a frontend service using Streamlit.
+# It also defines shared volumes for logging and networks for inter-service communication.
+#################################
+x-proxy-env: &proxy-env
+  HTTP_PROXY: ${HTTP_PROXY:-}
+  HTTPS_PROXY: ${HTTPS_PROXY:-}
+  NO_PROXY: ${NO_PROXY:-}
+  http_proxy: ${http_proxy:-}
+  https_proxy: ${https_proxy:-}
+  no_proxy: ${no_proxy:-}
+
+x-base-image-build-env: &base-image-build-env
+  PYTHON_SLIM_BOOKWORM_IMAGE: ${PYTHON_SLIM_BOOKWORM_IMAGE:-python:3.11-slim-bookworm}
+  PYTHON_SLIM_IMAGE: ${PYTHON_SLIM_IMAGE:-python:3.11-slim}
+
+x-build-args: &build-args
+  <<: [*proxy-env, *base-image-build-env]
+
 services:
   #############################
   # Backend (FastAPI)
@@ -9,9 +29,10 @@ services:
     ports:
       - "8000:8000"
     environment:
+      <<: *proxy-env
       LOG_PATH: /var/log/translator/backend.log
-      OPENAI_API_BASE: ${OPENAI_API_BASE:-http://ollama:11434/v1}
-      OPENAI_API_KEY: ${OPENAI_API_KEY:-ollama}
+      OPENAI_API_BASE: ${OPENAI_API_BASE}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
       TRANSLATE_MODEL: ${TRANSLATE_MODEL:-translategemma:4b}
     volumes:
       - translator-logs:/var/log/translator
@@ -31,6 +52,7 @@ services:
     ports:
       - "8501:8501"
     environment:
+      <<: *proxy-env
       LOG_PATH: /var/log/translator/frontend.log
       BACKEND_URL: http://backend-net:8000
       STREAMLIT_BROWSER_GATHER_USAGE_STATS: "false"
