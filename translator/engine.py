@@ -117,6 +117,16 @@ class Translator:
             if not text:
                 raise ValueError("Input text cannot be empty.")
 
+            prompt = (
+                f"You are a professional {src_lang_name} ({src_lang_code}) to "
+                f"{trg_lang_name} ({trg_lang_code}) translator. Your goal is to accurately "
+                f"convey the meaning and nuances of the original {src_lang_name} text while "
+                f"adhering to {trg_lang_name} grammar, vocabulary, and cultural sensitivities.\n"
+                f"Produce only the {trg_lang_name} translation, without any additional "
+                f"explanations or commentary. Please translate the following {src_lang_name} "
+                f"text into {trg_lang_name}:\n\n\n{text}"
+            )
+
             response = self.client.chat.completions.create(
                 model=self.model,
                 messages=[{"role": "user", "content": prompt}],
