@@ -1,6 +1,13 @@
+"""Translation engine backed by an OpenAI-compatible chat/completions API.
+
+Wraps the OpenAI Python client to call a TranslateGemma model served by any
+OpenAI-compatible inference backend (e.g. Ollama). Language detection is
+provided by ``langdetect``; country flag emojis are resolved via ``langcodes``,
+``pycountry``, and ``emoji-country-flag``.
+"""
+
 import logging
 import os
-from typing import Any
 
 import flag
 import pycountry
@@ -10,53 +17,67 @@ from openai import OpenAI
 
 
 class Translator:
-    """
-    Translator class for handling text translation using TranslateGemma via an
-    OpenAI-compatible chat/completions API endpoint.
+    """Translation engine that calls a TranslateGemma model via a chat completions API.
+
+    The engine detects the source language of arbitrary text, resolves human-
+    readable language names and country flag emojis for display, and submits
+    a structured translation prompt to the configured model.
+
+    Attributes:
+        client: OpenAI-compatible API client.
+        model: Model identifier passed to every completions request.
+        src_lang: ISO 639-1 code of the most recently detected source language,
+            or ``None`` before the first detection call.
     """
 
     def __init__(self):
-        """
-        Initializes the Translator:
-        - Prepares logger for diagnostics.
-        - Creates the OpenAI-compatible API client.
-        - Reads model name from environment.
+        """Initialise the Translator.
+
+        Reads ``OPENAI_API_BASE`` (required) and ``TRANSLATE_MODEL`` (optional)
+        from the environment and sets up the API client.
+
+        Raises:
+            ValueError: If ``OPENAI_API_BASE`` is not set.
         """
         self.logger = logging.getLogger(self.__class__.__name__)
         self.client = self._create_client()
-        self.model = os.getenv("INFERENCE_MODEL", "google/translate-gemma-2b-it")
+        self.model = os.getenv("TRANSLATE_MODEL", "google/translate-gemma-2b-it")
         self.src_lang = None
 
     def _create_client(self) -> OpenAI:
-        """
-        Creates an OpenAI-compatible client from environment variables.
+        """Create an OpenAI-compatible client from environment variables.
 
-        Required env vars:
-            INFERENCE_API_BASE_URL: Base URL of the OpenAI-compatible endpoint.
+        Reads the following environment variables:
 
-        Optional env vars:
-            INFERENCE_API_KEY: API key (defaults to "dummy" for local servers).
+        * ``OPENAI_API_BASE`` *(required)* — base URL of the inference endpoint,
+          including the ``/v1`` path (e.g. ``http://ollama:11434/v1``).
+        * ``OPENAI_API_KEY`` *(optional)* — API key; defaults to ``"dummy"`` for
+          local servers that do not enforce authentication.
 
         Returns:
             OpenAI: Configured client instance.
+
+        Raises:
+            ValueError: If ``OPENAI_API_BASE`` is not set.
         """
-        base_url = os.getenv("INFERENCE_API_BASE_URL")
-        api_key = os.getenv("INFERENCE_API_KEY", "dummy")
+        base_url = os.getenv("OPENAI_API_BASE")
+        api_key = os.getenv("OPENAI_API_KEY", "dummy")
         if not base_url:
-            raise ValueError(
-                "INFERENCE_API_BASE_URL environment variable is required."
-            )
+            raise ValueError("OPENAI_API_BASE environment variable is required.")
         return OpenAI(base_url=base_url, api_key=api_key)
 
     def _get_country_flag(self, language_name: str) -> str:
-        """
-        Convert a language name to the corresponding country flag emoji.
+        """Return the country flag emoji that best represents a language.
+
+        Uses ``langcodes`` to maximise the language tag and extract the primary
+        territory, then converts the territory code to a flag emoji.
 
         Args:
-            language_name (str): Language name (e.g. "French").
+            language_name: Language name as a human-readable string (e.g. ``"French"``).
 
         Returns:
-            str: Country flag emoji (e.g. "🇫🇷"), or empty string on failure.
+            The flag emoji (e.g. ``"🇫🇷"``), or an empty string if the language
+            cannot be resolved to a territory.
         """
         try:
             lang = Language.find(language_name)
@@ -66,15 +87,39 @@ class Translator:
             self.logger.error(f"Error converting language to country flag: {e}")
             return ""
 
-    def detect_language(self, text: str) -> dict[str, str]:
-        """
-        Detect the language of a text using langdetect.
+    def get_language_info(self, code: str) -> dict[str, str]:
+        """Return the display name and flag emoji for an ISO 639-1 language code.
 
         Args:
-            text (str): Text to detect the language of.
+            code: ISO 639-1 language code (e.g. ``"fr"``).
 
         Returns:
-            dict[str, str]: A dictionary with 'name' and 'flag' of the detected language.
+            A dict with keys ``"name"`` (human-readable language name) and
+            ``"flag"`` (country flag emoji). Falls back to the raw ``code`` as
+            the name and an empty string as the flag if the code is not found.
+        """
+        try:
+            lang_obj = pycountry.languages.get(alpha_2=code)
+            lang_name = lang_obj.name if lang_obj else code
+            country_flag = self._get_country_flag(lang_name)
+            return {"name": lang_name, "flag": country_flag}
+        except Exception as e:
+            self.logger.error(f"Error looking up language info for '{code}': {e}")
+            return {"name": code, "flag": ""}
+
+    def detect_language(self, text: str) -> dict[str, str]:
+        """Detect the language of a text string.
+
+        Stores the detected ISO 639-1 code in ``self.src_lang`` as a side effect
+        so that callers can retrieve the raw code after the call.
+
+        Args:
+            text: Text whose language should be detected.
+
+        Returns:
+            A dict with keys ``"name"`` (human-readable language name) and
+            ``"flag"`` (country flag emoji). Returns ``{"name": "", "flag": ""}``
+            if detection fails.
         """
         try:
             self.src_lang = detect(text)
