@@ -55,6 +55,7 @@ services:
       LOG_PATH: /var/log/translator/frontend.log
       BACKEND_URL: http://backend-net:8000
       STREAMLIT_BROWSER_GATHER_USAGE_STATS: "false"
+      DEFAULT_TARGET_LANGUAGE: ${DEFAULT_TARGET_LANGUAGE:-English}
     depends_on:
       - backend
     volumes:
