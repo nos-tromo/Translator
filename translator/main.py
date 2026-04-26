@@ -19,12 +19,14 @@ from pathlib import Path
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from loguru import logger
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, field_validator
 
 from translator.engine import Translator
 from translator.log_cfg import setup_logger
 
 setup_logger()
+
+MAX_TEXT_LENGTH = 20_000
 
 # === FastAPI Setup ===
 
@@ -52,15 +54,35 @@ class TranslationRequest(BaseModel):
     """Request body for ``POST /translate``.
 
     Attributes:
-        text: The text to translate.
+        text: The text to translate. Must be 1–``MAX_TEXT_LENGTH`` characters
+            after stripping leading/trailing whitespace.
         target_lang: ISO 639-1 code of the desired target language (e.g. ``"fr"``).
         source_lang: ISO 639-1 code of the source language. When omitted the
             source language is auto-detected from ``text``.
     """
 
-    text: str
+    text: str = Field(..., min_length=1, max_length=MAX_TEXT_LENGTH)
     target_lang: str
     source_lang: str | None = None
+
+    @field_validator("text")
+    @classmethod
+    def _strip_text(cls, value: str) -> str:
+        """Strip leading and trailing whitespace from the text.
+
+        Args:
+            value (str): The text to be stripped.
+
+        Returns:
+            str: The stripped text.
+
+        Raises:
+            ValueError: If the resulting text is empty or contains only whitespace.
+        """
+        stripped = value.strip()
+        if not stripped:
+            raise ValueError("text must not be empty or whitespace only")
+        return stripped
 
 
 class DetectedLanguage(BaseModel):
