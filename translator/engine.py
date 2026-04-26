@@ -28,8 +28,6 @@ class Translator:
     Attributes:
         client: OpenAI-compatible API client.
         model: Model identifier passed to every completions request.
-        src_lang: ISO 639-1 code of the most recently detected source language,
-            or ``None`` before the first detection call.
     """
 
     def __init__(self):
@@ -44,7 +42,6 @@ class Translator:
         self.logger = logging.getLogger(self.__class__.__name__)
         self.client = self._create_client()
         self.model = os.getenv("TRANSLATE_MODEL", "google/translate-gemma-2b-it")
-        self.src_lang = None
 
     def _create_client(self) -> OpenAI:
         """Create an OpenAI-compatible client from environment variables.
@@ -55,6 +52,9 @@ class Translator:
           including the ``/v1`` path (e.g. ``http://ollama:11434/v1``).
         * ``OPENAI_API_KEY`` *(optional)* — API key; defaults to ``"dummy"`` for
           local servers that do not enforce authentication.
+        * ``OPENAI_TIMEOUT`` *(optional)* — request timeout in seconds; defaults
+          to ``60``. Bounds the time a worker can spend waiting on the upstream
+          inference endpoint.
 
         Returns:
             OpenAI: Configured client instance.
@@ -64,9 +64,10 @@ class Translator:
         """
         base_url = os.getenv("OPENAI_API_BASE")
         api_key = os.getenv("OPENAI_API_KEY", "dummy")
+        timeout = float(os.getenv("OPENAI_TIMEOUT", "60"))
         if not base_url:
             raise ValueError("OPENAI_API_BASE environment variable is required.")
-        return OpenAI(base_url=base_url, api_key=api_key)
+        return OpenAI(base_url=base_url, api_key=api_key, timeout=timeout)
 
     def _get_country_flag(self, language_name: str) -> str:
         """Return the country flag emoji that best represents a language.
@@ -112,26 +113,23 @@ class Translator:
     def detect_language(self, text: str) -> dict[str, str]:
         """Detect the language of a text string.
 
-        Stores the detected ISO 639-1 code in ``self.src_lang`` as a side effect
-        so that callers can retrieve the raw code after the call.
-
         Args:
             text: Text whose language should be detected.
 
         Returns:
-            A dict with keys ``"name"`` (human-readable language name) and
-            ``"flag"`` (country flag emoji). Returns ``{"name": "", "flag": ""}``
-            if detection fails.
+            A dict with keys ``"code"`` (ISO 639-1 language code), ``"name"``
+            (human-readable language name) and ``"flag"`` (country flag emoji).
+            Returns ``{"code": "", "name": "", "flag": ""}`` if detection fails.
         """
         try:
-            self.src_lang = detect(text)
-            src_lang_obj = pycountry.languages.get(alpha_2=self.src_lang)
-            src_lang_name = src_lang_obj.name if src_lang_obj else self.src_lang
+            src_lang_code = detect(text)
+            src_lang_obj = pycountry.languages.get(alpha_2=src_lang_code)
+            src_lang_name = src_lang_obj.name if src_lang_obj else src_lang_code
             country_flag = self._get_country_flag(src_lang_name)
-            return {"name": src_lang_name, "flag": country_flag}
+            return {"code": src_lang_code, "name": src_lang_name, "flag": country_flag}
         except Exception as e:
             self.logger.error(f"Error detecting language: {e}")
-            return {"name": "", "flag": ""}
+            return {"code": "", "name": "", "flag": ""}
 
     def translate(
         self,
