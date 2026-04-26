@@ -12,8 +12,10 @@ import os
 import flag
 import pycountry
 from langcodes import Language
-from langdetect import detect
+from langdetect import DetectorFactory, detect
 from openai import OpenAI
+
+DetectorFactory.seed = 42  # Set seed for reproducibility in language detection
 
 
 class Translator:
