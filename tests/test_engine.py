@@ -45,6 +45,52 @@ def test_create_client_succeeds_with_base_url(translator: Translator) -> None:
     assert translator.client is not None
 
 
+def test_create_client_passes_timeout(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Passes ``OPENAI_TIMEOUT`` to the OpenAI client constructor as a float.
+
+    Args:
+        monkeypatch: Pytest fixture for setting env vars and patching ``OpenAI``.
+    """
+    captured: dict[str, object] = {}
+
+    def fake_openai(**kwargs: object) -> MagicMock:
+        """Capture the kwargs passed to the OpenAI constructor for inspection.
+
+        Returns:
+            MagicMock: Dummy client instance to satisfy the Translator constructor.
+        """        
+        captured.update(kwargs)
+        return MagicMock()
+
+    monkeypatch.setenv("OPENAI_TIMEOUT", "5")
+    monkeypatch.setattr("translator.engine.OpenAI", fake_openai)
+    Translator()
+    assert captured["timeout"] == 5.0
+
+
+def test_create_client_default_timeout(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Defaults the OpenAI client timeout to 60 seconds when ``OPENAI_TIMEOUT`` is unset.
+
+    Args:
+        monkeypatch: Pytest fixture for removing env vars and patching ``OpenAI``.
+    """
+    captured: dict[str, object] = {}
+
+    def fake_openai(**kwargs: object) -> MagicMock:
+        """Capture the kwargs passed to the OpenAI constructor for inspection.
+
+        Returns:
+            MagicMock: Dummy client instance to satisfy the Translator constructor.
+        """        
+        captured.update(kwargs)
+        return MagicMock()
+
+    monkeypatch.delenv("OPENAI_TIMEOUT", raising=False)
+    monkeypatch.setattr("translator.engine.OpenAI", fake_openai)
+    Translator()
+    assert captured["timeout"] == 60.0
+
+
 # ── _get_country_flag ──────────────────────────────────────────────────────────
 
 
@@ -95,30 +141,32 @@ def test_get_language_info_unknown_code(translator: Translator) -> None:
 
 
 def test_detect_language_english(translator: Translator) -> None:
-    """Detects English text and returns the resolved language name.
+    """Detects English text and returns the resolved name and ISO code.
 
     Args:
         translator: Translator instance provided by the ``translator`` fixture.
     """
     result = translator.detect_language("The quick brown fox jumps over the lazy dog.")
     assert result["name"] == "English"
-    assert translator.src_lang == "en"
+    assert result["code"] == "en"
 
 
-def test_detect_language_sets_src_lang(translator: Translator) -> None:
-    """Sets ``src_lang`` to the detected ISO 639-1 code after a successful call.
+def test_detect_language_french_returns_code(translator: Translator) -> None:
+    """Returns the detected ISO 639-1 code for French text.
 
     Args:
         translator: Translator instance provided by the ``translator`` fixture.
     """
-    translator.detect_language("Bonjour le monde, comment allez-vous aujourd'hui?")
-    assert translator.src_lang == "fr"
+    result = translator.detect_language(
+        "Bonjour le monde, comment allez-vous aujourd'hui?"
+    )
+    assert result["code"] == "fr"
 
 
 def test_detect_language_returns_empty_on_error(
     translator: Translator, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Returns ``{"name": "", "flag": ""}`` when the underlying detect call raises.
+    """Returns an empty ``code``/``name``/``flag`` dict when ``detect`` raises.
 
     Args:
         translator: Translator instance provided by the ``translator`` fixture.
@@ -128,7 +176,23 @@ def test_detect_language_returns_empty_on_error(
         "translator.engine.detect", lambda _: (_ for _ in ()).throw(Exception("fail"))
     )
     result = translator.detect_language("???")
-    assert result == {"name": "", "flag": ""}
+    assert result == {"code": "", "name": "", "flag": ""}
+
+
+def test_detect_language_deterministic(translator: Translator) -> None:
+    """Returns the same code on repeated detection of identical text.
+
+    Guards the ``DetectorFactory.seed`` setting that pins langdetect's RNG and
+    keeps results reproducible across requests.
+
+    Args:
+        translator: Translator instance provided by the ``translator`` fixture.
+    """
+    text = "The quick brown fox jumps over the lazy dog."
+    first = translator.detect_language(text)
+    second = translator.detect_language(text)
+    assert first["code"] == second["code"]
+    assert first["code"] != ""
 
 
 # ── translate ──────────────────────────────────────────────────────────────────

@@ -11,6 +11,8 @@ from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 
+from translator.main import MAX_TEXT_LENGTH
+
 
 # ── GET /languages ─────────────────────────────────────────────────────────────
 
@@ -72,8 +74,11 @@ def test_translate_auto_detect(client: TestClient) -> None:
         client: TestClient provided by the ``client`` fixture.
     """
     with patch("translator.main.translator") as mock_t:
-        mock_t.detect_language.return_value = {"name": "English", "flag": "🇬🇧"}
-        mock_t.src_lang = "en"
+        mock_t.detect_language.return_value = {
+            "code": "en",
+            "name": "English",
+            "flag": "🇬🇧",
+        }
         mock_t.translate.return_value = "Bonjour le monde"
 
         r = client.post("/translate", json={"text": "Hello world", "target_lang": "fr"})
@@ -113,8 +118,11 @@ def test_translate_calls_engine_with_correct_args(client: TestClient) -> None:
         client: TestClient provided by the ``client`` fixture.
     """
     with patch("translator.main.translator") as mock_t:
-        mock_t.detect_language.return_value = {"name": "English", "flag": "🇬🇧"}
-        mock_t.src_lang = "en"
+        mock_t.detect_language.return_value = {
+            "code": "en",
+            "name": "English",
+            "flag": "🇬🇧",
+        }
         mock_t.translate.return_value = "Bonjour"
 
         client.post("/translate", json={"text": "Hello", "target_lang": "fr"})
@@ -129,8 +137,11 @@ def test_translate_returns_500_on_engine_error(client: TestClient) -> None:
         client: TestClient provided by the ``client`` fixture.
     """
     with patch("translator.main.translator") as mock_t:
-        mock_t.detect_language.return_value = {"name": "English", "flag": ""}
-        mock_t.src_lang = "en"
+        mock_t.detect_language.return_value = {
+            "code": "en",
+            "name": "English",
+            "flag": "",
+        }
         mock_t.translate.side_effect = RuntimeError("Translation failed")
 
         r = client.post("/translate", json={"text": "Hello", "target_lang": "fr"})
@@ -165,8 +176,11 @@ def test_translate_unknown_target_lang_falls_back_to_code(client: TestClient) ->
         client: TestClient provided by the ``client`` fixture.
     """
     with patch("translator.main.translator") as mock_t:
-        mock_t.detect_language.return_value = {"name": "English", "flag": ""}
-        mock_t.src_lang = "en"
+        mock_t.detect_language.return_value = {
+            "code": "en",
+            "name": "English",
+            "flag": "",
+        }
         mock_t.translate.return_value = "some translation"
 
         r = client.post("/translate", json={"text": "Hello", "target_lang": "xx"})
@@ -175,3 +189,34 @@ def test_translate_unknown_target_lang_falls_back_to_code(client: TestClient) ->
     # target lang name falls back to the raw code "xx"
     mock_t.translate.assert_called_once()
     assert mock_t.translate.call_args.args[3] == "xx"
+
+
+def test_translate_empty_text_returns_422(client: TestClient) -> None:
+    """Returns 422 when ``text`` is the empty string.
+
+    Args:
+        client: TestClient provided by the ``client`` fixture.
+    """
+    r = client.post("/translate", json={"text": "", "target_lang": "fr"})
+    assert r.status_code == 422
+
+
+def test_translate_whitespace_only_text_returns_422(client: TestClient) -> None:
+    """Returns 422 when ``text`` contains only whitespace.
+
+    Args:
+        client: TestClient provided by the ``client`` fixture.
+    """
+    r = client.post("/translate", json={"text": "   \t\n", "target_lang": "fr"})
+    assert r.status_code == 422
+
+
+def test_translate_oversize_text_returns_422(client: TestClient) -> None:
+    """Returns 422 when ``text`` exceeds ``MAX_TEXT_LENGTH``.
+
+    Args:
+        client: TestClient provided by the ``client`` fixture.
+    """
+    oversized = "a" * (MAX_TEXT_LENGTH + 1)
+    r = client.post("/translate", json={"text": oversized, "target_lang": "fr"})
+    assert r.status_code == 422
