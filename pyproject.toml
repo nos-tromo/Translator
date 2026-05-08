@@ -7,6 +7,7 @@ authors = [
 ]
 readme = "README.md"
 requires-python = ">=3.11,<4"
+license = "Apache-2.0"
 dependencies = [
     "dotenv>=0.9.9",
     "emoji-country-flag>=2.1.0",
@@ -22,6 +23,9 @@ dependencies = [
     "types-requests>=2.33.0.20260503",
     "uvicorn>=0.46.0",
 ]
+
+[project.urls]
+Repository = "https://github.com/nos-tromo/translator.git"
 
 [dependency-groups]
 dev = [
@@ -50,4 +54,4 @@ testpaths = ["tests"]
 package = true
 
 [tool.uv.sources]
-docint = { workspace = true }
+translator = { workspace = true }
