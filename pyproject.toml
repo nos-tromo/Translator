@@ -30,6 +30,10 @@ dev = [
     "pytest>=9.0.3",
     "ruff>=0.15.12",
 ]
+frontend = [
+    "requests>=2.33.1",
+    "streamlit>=1.57.0",
+]
 
 [build-system]
 requires = ["setuptools>=82.0.1", "wheel"]
