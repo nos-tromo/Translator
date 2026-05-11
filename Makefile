@@ -2,9 +2,14 @@
 
 .PHONY: network volumes build bundle no-build up
 
-# Versioned image tag: YYYY-MM-DD-<short-sha>. Override by exporting
-# TRANSLATOR_VERSION before invoking make. Mirrors scripts/bundle_images.sh.
-TRANSLATOR_VERSION ?= $(shell date +%Y-%m-%d)-$(shell git rev-parse --short HEAD)
+# Versioned image tag.
+# On production: read from .translator-version written by bundle_images.sh.
+# On dev: compute YYYY-MM-DD[-<short-sha>] on the fly.
+# Override entirely by exporting TRANSLATOR_VERSION before invoking make.
+TRANSLATOR_VERSION ?= $(shell \
+    cat .translator-version 2>/dev/null || \
+    { _s=$$(git rev-parse --short HEAD 2>/dev/null); \
+      echo "$$(date +%Y-%m-%d)$${_s:+-$$_s}"; } )
 export TRANSLATOR_VERSION
 
 # Create the external Docker volumes (one-time per host; idempotent)
