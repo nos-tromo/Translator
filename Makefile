@@ -1,6 +1,6 @@
 # Build-host helpers for translator.
 
-.PHONY: network volumes build bundle no-build up
+.PHONY: network volumes build bundle no-build up stop
 
 # Versioned image tag.
 # On production: read from .translator-version written by bundle_images.sh.
@@ -35,3 +35,7 @@ no-build:
 # Build and run the stack
 up:
 	DOCKER_BUILDKIT=1 docker compose up -d
+
+# Stop the stack
+stop:
+	docker compose stop
