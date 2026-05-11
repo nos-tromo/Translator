@@ -1,16 +1,20 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Always compute a fresh version from git + date so repeated bundle runs
-# produce distinct tags. .translator-version (if present) is never used as input
-# here — it is only written as output for production hosts.
+# Always compute a fresh version from git so repeated bundle runs produce
+# distinct tags. Uses the commit date (not the build date) for reproducibility.
+# Falls back to today's date when not in a git repo.
+# .translator-version (if present) is never used as input here — it is only
+# written as output for production hosts.
 # To pin a specific tag, set TRANSLATOR_VERSION_OVERRIDE in your shell before
 # invoking make.
 if [[ -n "${TRANSLATOR_VERSION_OVERRIDE:-}" ]]; then
   export TRANSLATOR_VERSION="$TRANSLATOR_VERSION_OVERRIDE"
 else
   _git_sha=$(git rev-parse --short HEAD 2>/dev/null || true)
-  export TRANSLATOR_VERSION="$(date +%Y-%m-%d)${_git_sha:+-${_git_sha}}"
+  _git_date=$(git log -1 --format=%cs 2>/dev/null || true)
+  _date="${_git_date:-$(date +%Y-%m-%d)}"
+  export TRANSLATOR_VERSION="${_date}${_git_sha:+-${_git_sha}}"
 fi
 echo "TRANSLATOR_VERSION=$TRANSLATOR_VERSION"
 
