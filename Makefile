@@ -1,6 +1,6 @@
 # Build-host helpers for translator.
 
-.PHONY: network volumes build bundle up stop
+.PHONY: network volumes bundle build up stop
 
 # Versioned image tag.
 # On production: read from .translator-version written by bundle_images.sh.
@@ -20,13 +20,13 @@ network:
 volumes:
 	DOCKER_BUILDKIT=1 docker volume create ollama-cache
 
-# Build the stack
-build:
-	DOCKER_BUILDKIT=1 docker compose build
-
 # Build stack and ship as versioned .tar.gz pair (built + pulled)
 bundle:
 	./scripts/bundle_images.sh
+
+# Build the stack
+build:
+	DOCKER_BUILDKIT=1 docker compose build
 
 # Run the stack without building
 up:
