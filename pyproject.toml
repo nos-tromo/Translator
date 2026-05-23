@@ -50,6 +50,11 @@ include = ["translator*"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 
+[tool.mypy]
+ignore_missing_imports = true
+no_incremental = true
+disable_error_code = ["import-untyped", "attr-defined", "assignment"]
+
 [tool.uv]
 package = true
 

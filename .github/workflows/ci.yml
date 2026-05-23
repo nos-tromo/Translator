@@ -1,68 +1,25 @@
 name: CI
 
-permissions:
-  contents: read
-
 on:
   push:
     branches: [main]
-    paths-ignore:
-      - 'README.md'
-      - '.env.example'
   pull_request:
     branches: [main]
-    paths-ignore:
-      - 'README.md'
-      - '.env.example'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  # ── Pytest ────────────────────────────────────────────────────────────────────
-  pytest:
-    runs-on: ubuntu-latest
-    env:
-      OPENAI_API_BASE: http://test-host:11434/v1
-    steps:
-      - uses: actions/checkout@v6
-
-      - uses: astral-sh/setup-uv@v7
-        with:
-          python-version: '3.11'
-          enable-cache: true          # caches ~/.cache/uv keyed on uv.lock
-
-      - name: Sync dependencies
-        run: uv sync --frozen --group dev
-
-      - name: Run tests
-        run: uv run pytest
-
-  # ── Docker builds ─────────────────────────────────────────────────────────────
-  build:
-    needs: pytest
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        include:
-          - name: backend
-            dockerfile: Dockerfile.backend
-          - name: frontend
-            dockerfile: Dockerfile.frontend
-
-    steps:
-      - name: Free Disk Space
-        run: |
-          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
-          sudo docker image prune --all --force
-
-      - uses: actions/checkout@v6
-
-      - uses: docker/setup-buildx-action@v4
-
-      - name: Build ${{ matrix.name }} image
-        uses: docker/build-push-action@v7
-        with:
-          context: .
-          file: ${{ matrix.dockerfile }}
-          push: false
-          tags: translator-${{ matrix.name }}:ci-${{ github.sha }}
-          cache-from: type=gha,scope=${{ matrix.dockerfile }}
-          cache-to: type=gha,mode=max,scope=${{ matrix.dockerfile }}
+  ci:
+    # Pinned to nos-tromo/.github@ddb514a until v1 is tagged.
+    uses: nos-tromo/.github/.github/workflows/python-app-ci.yml@ddb514ae048b7f7cf16682219dbf66a892b50bdc
+    with:
+      python-versions: '["3.11"]'
+      uv-sync-args: '--frozen --group dev'
+      docker-build: true
+      test-env: |
+        OPENAI_API_BASE=http://test-host:11434/v1
